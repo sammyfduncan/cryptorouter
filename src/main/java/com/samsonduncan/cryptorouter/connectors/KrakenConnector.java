@@ -1,6 +1,8 @@
 package com.samsonduncan.cryptorouter.connectors;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.samsonduncan.cryptorouter.model.kraken.KrakenOrderBookMessage;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import com.samsonduncan.cryptorouter.model.kraken.KrakenSubscriptionStatus;
@@ -43,21 +45,32 @@ public class KrakenConnector extends WebSocketClient {
     //later, here parse JSON and update order book
     @Override
     public void onMessage(String message) {
-        //check what kind of message, first if contains status info
-        if (message.contains("\"event\":\"subscriptionStatus\"")) {
-            try {
-                //if status message, parse into obj
+        try {
+            //check what kind of message
+            if (message.contains("\"event\":\"subscriptionStatus\"")) {
                 KrakenSubscriptionStatus status = objectMapper.readValue(
                         message,
                         KrakenSubscriptionStatus.class);
                 System.out.println("Subscription status: " + status);
-            } catch (Exception e) {
-                //if error
-                System.err.println("Error parsing subscription status: " + e.getMessage());
+
+            } else if (message.contains("\"book-10\"")) {
+                //it's an order book snapshot or update
+                JsonNode rootNode = objectMapper.readTree(message);
+                JsonNode payload = rootNode.get(1); //data obj is second element
+                String pair = rootNode.get(3).asText(); //pair is fourth element
+
+                KrakenOrderBookMessage bookMessage = objectMapper.treeToValue(
+                        payload,
+                        KrakenOrderBookMessage.class);
+                System.out.println("Parsed book data for: " + pair + ": " + bookMessage);
+
+            } else {
+                //some other message, log for now
+                System.out.println("Received other message: " + message);
             }
-        } else {
-            //for now just print any other msg
-            System.out.println("Recieved market data: " + message);
+        } catch (Exception e) {
+            System.err.println("Failed to process message: " + message);
+            e.printStackTrace();
         }
     }
 
