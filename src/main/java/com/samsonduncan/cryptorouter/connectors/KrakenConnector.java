@@ -5,6 +5,7 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import jakarta.annotation.PostConstruct;
 
 public class KrakenConnector extends WebSocketClient {
 
@@ -43,4 +44,12 @@ public class KrakenConnector extends WebSocketClient {
     public void onError(Exception e) {
         System.out.println("Error occured: " + e);
     }
+
+    //Start the connection
+    @PostConstruct
+    public void startConnection() {
+        System.out.println("Starting construction, initialising kraken connection...");
+        connect();
+    }
+
 }
