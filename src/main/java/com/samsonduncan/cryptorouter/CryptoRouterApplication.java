@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class CryptorouterApplication {
+public class CryptoRouterApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(CryptorouterApplication.class, args);
+		SpringApplication.run(CryptoRouterApplication.class, args);
 	}
 
 }
