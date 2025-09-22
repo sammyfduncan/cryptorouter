@@ -47,28 +47,28 @@ public class CoinbaseConnector extends WebSocketClient {
     public void onOpen(ServerHandshake serverHandshake) {
         System.out.println("Connected to coinbase");
 
-        //call service to get JWT token
-        // In CoinbaseConnector.onOpen()
-        String jwt = authService.generateJwt();
-
-        //create subscription msg using jackson for correct formatting
-        ObjectNode subscriptionMessage = objectMapper.createObjectNode();
-
-        subscriptionMessage.put("type", "subscribe");
-        subscriptionMessage.putArray("product_ids").add("BTC_USD");
-        subscriptionMessage.put("channel", "level2");
-        subscriptionMessage.put("jwt", jwt);
-
-        //now convert obj into a JSON str
-        String jsonMsg = null;
         try {
-            jsonMsg = objectMapper.writeValueAsString(subscriptionMessage);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+            //call service to get JWT token
+            // In CoinbaseConnector.onOpen()
+            String jwt = authService.generateJwt();
 
-        send(jsonMsg);
-        System.out.println("Sent subscription message for BTC/USD book");
+            //create subscription msg using jackson for correct formatting
+            ObjectNode subscriptionMessage = objectMapper.createObjectNode();
+
+            subscriptionMessage.put("type", "subscribe");
+            subscriptionMessage.putArray("channels").add("level2_batch");
+            subscriptionMessage.putArray("product_ids").add("BTC-USD");
+            subscriptionMessage.put("jwt", jwt);
+
+            //now convert obj into a JSON str
+            String jsonPayload = objectMapper.writeValueAsString(subscriptionMessage);
+            send(jsonPayload);
+            System.out.println("Sent subscription message for BTC/USD book");
+
+        } catch (Exception e) {
+            System.err.println("Failed to send subscription message");
+            e.printStackTrace();
+        }
     }
 
     @Override
