@@ -1,32 +1,38 @@
 package com.samsonduncan.cryptorouter.connectors;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.samsonduncan.cryptorouter.model.coinbase.CoinbaseSnapshot;
 import com.samsonduncan.cryptorouter.model.coinbase.CoinbaseUpdate;
 import com.samsonduncan.cryptorouter.model.normalised.Exchange;
 import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBook;
 import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBookEntry;
+import com.samsonduncan.cryptorouter.services.CoinbaseAuthService;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 
 public class CoinbaseConnector extends WebSocketClient {
 
-    //jackson objmapper engine
+    //jackson objmapper engine, authservice
     private final ObjectMapper objectMapper;
+    private final CoinbaseAuthService authService;
 
     //holds most recent version of order book
     private NormalisedOrderBook coinbaseOrderBook;
 
-    public CoinbaseConnector(URI serverUri, SSLSocketFactory socketFactory) {
+    public CoinbaseConnector(URI serverUri, SSLSocketFactory socketFactory, CoinbaseAuthService authService) {
         super(serverUri);
         this.setSocketFactory(socketFactory);
 
@@ -34,21 +40,40 @@ public class CoinbaseConnector extends WebSocketClient {
         this.objectMapper.configure(
                 DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
                 false);
+        this.authService = authService;
     }
 
     @Override
     public void onOpen(ServerHandshake serverHandshake) {
         System.out.println("Connected to coinbase");
 
-        String subscriptionMessage = """
-            {
-             "type": "subscribe",
-             "product_ids": [ "BTC-USD" ],
-             "channels": [ "level2" ]
-            }
-            """;
+        //call service to get JWT token
+        String jwt = null;
+        try {
+            jwt = authService.generateJwt();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        } catch (InvalidKeySpecException e) {
+            throw new RuntimeException(e);
+        }
 
-        send(subscriptionMessage);
+        //create subscription msg using jackson for correct formatting
+        ObjectNode subscriptionMessage = objectMapper.createObjectNode();
+
+        subscriptionMessage.put("type", "subscribe");
+        subscriptionMessage.putArray("product_ids").add("BTC_USD");
+        subscriptionMessage.put("channel", "level2");
+        subscriptionMessage.put("jwt", jwt);
+
+        //now convert obj into a JSON str
+        String jsonMsg = null;
+        try {
+            jsonMsg = objectMapper.writeValueAsString(subscriptionMessage);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
+        send(jsonMsg);
         System.out.println("Sent subscription message for BTC/USD book");
     }
 

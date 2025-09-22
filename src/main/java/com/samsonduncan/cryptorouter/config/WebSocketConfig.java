@@ -2,6 +2,7 @@ package com.samsonduncan.cryptorouter.config;
 
 import com.samsonduncan.cryptorouter.connectors.CoinbaseConnector;
 import com.samsonduncan.cryptorouter.connectors.KrakenConnector;
+import com.samsonduncan.cryptorouter.services.CoinbaseAuthService;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +26,7 @@ public class WebSocketConfig {
 
     //CoinbaseConnector bean
     @Bean
-    public CoinbaseConnector coinbaseConnector() throws URISyntaxException, NoSuchAlgorithmException {
+    public CoinbaseConnector coinbaseConnector(CoinbaseAuthService authService) throws URISyntaxException, NoSuchAlgorithmException {
         URI serverUri = new URI("wss://ws-feed.exchange.coinbase.com");
         System.out.println("Creating CoinbaseConnector bean...");
 
@@ -33,7 +34,7 @@ public class WebSocketConfig {
         SSLContext sslContext = SSLContext.getDefault();
         SSLSocketFactory socketFactory = sslContext.getSocketFactory();
 
-        return new CoinbaseConnector(serverUri, socketFactory);
+        return new CoinbaseConnector(serverUri, socketFactory, authService);
     }
 
     //Automatically receives connectors above and connects when app is ready
