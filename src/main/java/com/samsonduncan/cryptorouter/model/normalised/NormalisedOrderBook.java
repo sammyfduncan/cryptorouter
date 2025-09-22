@@ -4,7 +4,7 @@ import lombok.Data;
 import java.time.Instant;
 import java.util.*;
 
-//Holds complete order book for a single trading pair.
+//Standardised order book obj for a single trading pair.
 @Data
 public class NormalisedOrderBook {
 

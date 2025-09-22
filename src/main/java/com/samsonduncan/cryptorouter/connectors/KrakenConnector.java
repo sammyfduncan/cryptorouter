@@ -84,11 +84,4 @@ public class KrakenConnector extends WebSocketClient {
         System.out.println("Error occured: " + e);
     }
 
-    //Start the connection
-    @PostConstruct
-    public void startConnection() {
-        System.out.println("Starting construction, initialising kraken connection...");
-        connect();
-    }
-
 }
