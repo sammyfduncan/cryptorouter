@@ -67,10 +67,16 @@ public class KrakenConnector extends WebSocketClient {
                 JsonNode payload = rootNode.get(1); //data obj is second element
                 String pair = rootNode.get(3).asText(); //pair is fourth element
 
+                //parse message
                 KrakenOrderBookMessage bookMessage = objectMapper.treeToValue(
                         payload,
                         KrakenOrderBookMessage.class);
-                System.out.println("Parsed book data for: " + pair + ": " + bookMessage);
+
+                //now translate parsed message
+                NormalisedOrderBook normalisedBook = translateMessage(
+                        bookMessage,
+                        pair);
+                System.out.println("Parsed and translated book data: " + normalisedBook);
 
             } else {
                 //some other message, log for now
@@ -89,7 +95,7 @@ public class KrakenConnector extends WebSocketClient {
 
     @Override
     public void onError(Exception e) {
-        System.out.println("Error occured: " + e);
+        System.out.println("Error occurred: " + e);
     }
 
     //helper to translate raw msg into NormalisedOrderBook

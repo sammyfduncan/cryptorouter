@@ -11,6 +11,7 @@ import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBookEntry;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
+import javax.net.ssl.SSLSocketFactory;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
@@ -25,8 +26,10 @@ public class CoinbaseConnector extends WebSocketClient {
     //holds most recent version of order book
     private NormalisedOrderBook coinbaseOrderBook;
 
-    public CoinbaseConnector(URI serverUri) {
+    public CoinbaseConnector(URI serverUri, SSLSocketFactory socketFactory) {
         super(serverUri);
+        this.setSocketFactory(socketFactory);
+
         this.objectMapper = new ObjectMapper();
         this.objectMapper.configure(
                 DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
@@ -101,8 +104,9 @@ public class CoinbaseConnector extends WebSocketClient {
         System.out.println("Connection closed: " + reason);
     }
 
-    public void onError(Exception e) {
-        System.out.println("Error occurred: " + e);
+    public void onError(Exception ex) {
+        System.out.println("Error occurred: " + ex);
+        ex.printStackTrace();
     }
 
     //Translation helper for snapshots only
@@ -159,12 +163,11 @@ public class CoinbaseConnector extends WebSocketClient {
         //loop through list of changes for update obj
         for (List<String> change : update.getChanges()) {
             //extract data
-            String sideStr = change.get(0); //'buy' or 'sell'
+            String side = change.get(0); //'buy' or 'sell'
             String priceStr = change.get(1);
             String quantityStr = change.get(2);
 
             //convert to BigDecimal
-            BigDecimal side = new BigDecimal(sideStr);
             BigDecimal price = new BigDecimal(priceStr);
             BigDecimal quantity = new BigDecimal(quantityStr);
 
