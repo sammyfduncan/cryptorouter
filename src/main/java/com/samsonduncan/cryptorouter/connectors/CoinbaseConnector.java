@@ -48,6 +48,7 @@ public class CoinbaseConnector extends WebSocketClient {
         System.out.println("Connected to coinbase");
 
         //call service to get JWT token
+        // In CoinbaseConnector.onOpen()
         String jwt = authService.generateJwt();
 
         //create subscription msg using jackson for correct formatting

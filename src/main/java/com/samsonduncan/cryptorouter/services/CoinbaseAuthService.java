@@ -1,79 +1,89 @@
 package com.samsonduncan.cryptorouter.services;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.crypto.ECDSASigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Security;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
+import java.security.interfaces.ECPrivateKey;
+import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
-//Manages coinbase API Authentication
 @Service
 public class CoinbaseAuthService {
 
-    //register bouncy castle as security provider
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-
     @Value("${coinbase.advanced.api.key.name}")
-    private String name;
+    private String apiKeyName;
 
+    // inject the key as a single line string from application.properties
     @Value("${coinbase.advanced.api.private.key}")
-    private String key;
+    private String privateKeyString;
 
-    //generates JWT for authenticating w/ Coinbase advanced API
     public String generateJwt() {
         try {
-
-            PrivateKey privateKey = parsePrivateKeyWithBouncyCastle(key);
+            //Uses the official SDK's method.
+            PrivateKey privateKey = parsePrivateKeyFromString(privateKeyString);
             String jwtId = UUID.randomUUID().toString();
 
-            return Jwts.builder()
-                    .setId(jwtId)
-                    .setSubject(name)
-                    .setIssuer(name)
-                    .setExpiration(new Date(System.currentTimeMillis() + 1000 * 120))
-                    .setNotBefore(new Date(System.currentTimeMillis()))
-                    .setIssuedAt(new Date(System.currentTimeMillis()))
-                    .claim("uri", "websocket:/users/self/verify")
-                    .signWith(privateKey, SignatureAlgorithm.ES256)
-                    .compact();
-        } catch (IOException e) {
-            //wrap the exception to avoid having to declare it everywhere
-            throw new RuntimeException("Failed to parse private key", e);
+            JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256)
+                    .keyID(apiKeyName)
+                    .customParam("nonce", UUID.randomUUID().toString())
+                    .build();
+
+            // uri for WebSocket
+            String uri = "GET https://api.coinbase.com/api/v3/brokerage/products";
+
+            JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                    .subject(apiKeyName)
+                    .issuer("cdp")
+                    .claim("uri", uri)
+                    .expirationTime(new Date(Instant.now().plusSeconds(120).toEpochMilli()))
+                    .issueTime(new Date())
+                    .notBeforeTime(new Date())
+                    .build();
+
+            SignedJWT signedJWT = new SignedJWT(header, claimsSet);
+            JWSSigner signer = new ECDSASigner((ECPrivateKey) privateKey);
+            signedJWT.sign(signer);
+
+            return signedJWT.serialize();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Fatal error during JWT generation. Please verify the key content in application.properties.", e);
         }
     }
 
-    /**
-     *helper to parse a PEM key using Bouncy Castle
-     */
-    private PrivateKey parsePrivateKeyWithBouncyCastle(String pemKey) throws IOException {
-        // use PEMParser from Bouncy Castle to read the key
-        try (PEMParser pemParser = new PEMParser(new StringReader(pemKey))) {
+    private PrivateKey parsePrivateKeyFromString(String key) throws IOException {
+
+        String sanitizedKey = key.replace("\\n", "\n");
+
+        try (PEMParser pemParser = new PEMParser(new StringReader(sanitizedKey))) {
             Object parsedObject = pemParser.readObject();
 
-            // the JcaPEMKeyConverter converts the Bouncy Castle object to a standard Java PrivateKey
-            JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+            if (parsedObject == null) {
+                throw new IOException("PEMParser returned null. Ensure the key in application.properties is a valid, single-line string with \\n separators.");
+            }
 
-            //object could be of different types, we get the KeyPair and extract the private key
+            JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
             PEMKeyPair keyPair = (PEMKeyPair) parsedObject;
             return converter.getPrivateKey(keyPair.getPrivateKeyInfo());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
     }
 }

@@ -32,10 +32,8 @@ dependencies {
 	testImplementation("io.projectreactor:reactor-test")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	implementation("org.java-websocket:Java-WebSocket:1.5.7")
-	implementation("io.jsonwebtoken:jjwt-api:0.12.5")
-	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
-	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
 	implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
+	implementation("com.nimbusds:nimbus-jose-jwt:9.31")
 }
 
 tasks.withType<Test> {
