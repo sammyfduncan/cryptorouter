@@ -2,12 +2,20 @@ package com.samsonduncan.cryptorouter.connectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.samsonduncan.cryptorouter.model.kraken.KrakenOrderBookEntry;
 import com.samsonduncan.cryptorouter.model.kraken.KrakenOrderBookMessage;
+import com.samsonduncan.cryptorouter.model.normalised.Exchange;
+import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBook;
+import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBookEntry;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import com.samsonduncan.cryptorouter.model.kraken.KrakenSubscriptionStatus;
+
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
+
 import jakarta.annotation.PostConstruct;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 
@@ -82,6 +90,70 @@ public class KrakenConnector extends WebSocketClient {
     @Override
     public void onError(Exception e) {
         System.out.println("Error occured: " + e);
+    }
+
+    //helper to translate raw msg into NormalisedOrderBook
+    private NormalisedOrderBook translateMessage(
+            KrakenOrderBookMessage krakenMessage,
+            String tradingPair) {
+        NormalisedOrderBook normalisedBook = new NormalisedOrderBook();
+        Instant lastUpdated = Instant.now();
+
+        normalisedBook.setTradingPair(tradingPair);
+        normalisedBook.setLastUpdated(lastUpdated);
+
+        //translate bids
+
+        //if message has snapshot of bids 'bs'
+        if (krakenMessage.getBs() != null) {
+            //loop thru each entry in kraken snapshot bid list
+            for (KrakenOrderBookEntry krakenEntry : krakenMessage.getBs()) {
+                //translate kraken entry into normalised entry
+                NormalisedOrderBookEntry normalisedEntry = new NormalisedOrderBookEntry(
+                        new BigDecimal(krakenEntry.getPrice()), //convert price str to BD
+                        new BigDecimal(krakenEntry.getVolume()), //convert volume str
+                        Exchange.KRAKEN //set exchange enum
+                );
+                //add translated entry to normalised book bid list
+                normalisedBook.getBids().add(normalisedEntry);
+            }
+        }
+
+        //if message has update of bids 'b'
+        if (krakenMessage.getB() != null) {
+            for (KrakenOrderBookEntry krakenEntry : krakenMessage.getB()) {
+                NormalisedOrderBookEntry normalisedEntry = new NormalisedOrderBookEntry(
+                        new BigDecimal(krakenEntry.getPrice()),
+                        new BigDecimal(krakenEntry.getVolume()),
+                        Exchange.KRAKEN
+                );
+                normalisedBook.getBids().add(normalisedEntry);
+            }
+        }
+
+        //if message has snapshot of asks 'as'
+        if (krakenMessage.getAs() != null) {
+            for (KrakenOrderBookEntry krakenEntry : krakenMessage.getAs()) {
+                NormalisedOrderBookEntry normalisedEntry = new NormalisedOrderBookEntry(
+                        new BigDecimal(krakenEntry.getPrice()),
+                        new BigDecimal(krakenEntry.getVolume()),
+                        Exchange.KRAKEN);
+                normalisedBook.getAsks().add(normalisedEntry);
+            }
+        }
+
+        //if message has snapshot of asks 'a'
+        if (krakenMessage.getA() != null) {
+            for (KrakenOrderBookEntry krakenEntry : krakenMessage.getA()) {
+                NormalisedOrderBookEntry normalisedEntry = new NormalisedOrderBookEntry(
+                        new BigDecimal(krakenEntry.getPrice()),
+                        new BigDecimal(krakenEntry.getVolume()),
+                        Exchange.KRAKEN);
+                normalisedBook.getAsks().add(normalisedEntry);
+            }
+        }
+
+        return normalisedBook;
     }
 
 }

@@ -15,5 +15,7 @@ public class NormalisedOrderBook {
     private List<NormalisedOrderBookEntry> bids = new ArrayList<>();
     //list of asks sorted by lowest
     private List<NormalisedOrderBookEntry> asks = new ArrayList<>();
+
+
 }
 
