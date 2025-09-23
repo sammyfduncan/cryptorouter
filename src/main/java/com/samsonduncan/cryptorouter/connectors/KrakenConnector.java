@@ -7,6 +7,7 @@ import com.samsonduncan.cryptorouter.model.kraken.KrakenOrderBookMessage;
 import com.samsonduncan.cryptorouter.model.normalised.Exchange;
 import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBook;
 import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBookEntry;
+import com.samsonduncan.cryptorouter.services.OrderBookService;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import com.samsonduncan.cryptorouter.model.kraken.KrakenSubscriptionStatus;
@@ -19,13 +20,22 @@ import java.time.Instant;
 import jakarta.annotation.PostConstruct;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 
+/*
+Connector for Kraken Exchange.
+Contains all logic for subscribing to, and receiving WebSocket comms
+ */
 public class KrakenConnector extends WebSocketClient {
 
     //main engine from Jackson
     private final ObjectMapper objectMapper;
 
-    public KrakenConnector(URI serverUri) {
+    //holds OrderBookService
+    private final OrderBookService orderBook;
+
+    public KrakenConnector(URI serverUri, OrderBookService orderBook) {
         super(serverUri);
+
+        this.orderBook = orderBook;
 
         //configure objectMapper
         this.objectMapper = new ObjectMapper();
@@ -76,7 +86,9 @@ public class KrakenConnector extends WebSocketClient {
                 NormalisedOrderBook normalisedBook = translateMessage(
                         bookMessage,
                         pair);
-                System.out.println("Parsed and translated book data: " + normalisedBook);
+
+                //call OrderBookService
+                orderBook.processUpdate(normalisedBook);
 
             } else {
                 //some other message, log for now

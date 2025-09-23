@@ -11,8 +11,10 @@ import com.samsonduncan.cryptorouter.model.normalised.Exchange;
 import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBook;
 import com.samsonduncan.cryptorouter.model.normalised.NormalisedOrderBookEntry;
 import com.samsonduncan.cryptorouter.services.CoinbaseAuthService;
+import com.samsonduncan.cryptorouter.services.OrderBookService;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import org.springframework.core.annotation.Order;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.math.BigDecimal;
@@ -32,9 +34,16 @@ public class CoinbaseConnector extends WebSocketClient {
     //holds most recent version of order book
     private NormalisedOrderBook coinbaseOrderBook;
 
-    public CoinbaseConnector(URI serverUri, SSLSocketFactory socketFactory, CoinbaseAuthService authService) {
+    //holds OrderBookService obj
+    private final OrderBookService orderBook;
+
+    public CoinbaseConnector(URI serverUri,
+                             SSLSocketFactory socketFactory,
+                             CoinbaseAuthService authService,
+                             OrderBookService orderBook) {
         super(serverUri);
         this.setSocketFactory(socketFactory);
+        this.orderBook = orderBook;
 
         this.objectMapper = new ObjectMapper();
         this.objectMapper.configure(
@@ -88,7 +97,8 @@ public class CoinbaseConnector extends WebSocketClient {
                 //now translate parsed msg
                 this.coinbaseOrderBook = translateSnapshot(snapshot);
 
-                System.out.println("Parsed and translated Coinbase snapshot: " + this.coinbaseOrderBook);
+                //now call OrderBookService
+                orderBook.processUpdate(this.coinbaseOrderBook);
 
             } else if (type.equals("12update")) {
                 //if 12update, first check orderbook has been initialised
@@ -101,7 +111,8 @@ public class CoinbaseConnector extends WebSocketClient {
                     //then apply update with helper
                     updateNormalised(update, this.coinbaseOrderBook);
 
-                    System.out.println("Received coinbase update: " + this.coinbaseOrderBook);
+                    //call OrderBookService
+                    orderBook.processUpdate(this.coinbaseOrderBook);
                 }
 
             } else if (type.equals("subscriptions")) {
