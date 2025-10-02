@@ -20,12 +20,12 @@ exposes reactive stream (Flux) of consolidated order book
 @Service
 public class OrderBookService {
 
-    //Maps key is price, value is quantity
+    //Maps key is price, value is map showing quantity and exchange
     //Field for bids map (sorted from highest to lowest)
-    private final ConcurrentSkipListMap<BigDecimal, BigDecimal> bids =
+    private final ConcurrentSkipListMap<BigDecimal, Map<Exchange, BigDecimal>> bids =
             new ConcurrentSkipListMap<>(Comparator.reverseOrder());
-    //Asks map (from lowest to highest
-    private final ConcurrentSkipListMap<BigDecimal, BigDecimal> asks =
+    //Asks map (from lowest to highest)
+    private final ConcurrentSkipListMap<BigDecimal, Map<Exchange, BigDecimal>> asks =
             new ConcurrentSkipListMap<>();
 
     //Tracks specific price levels from each exchange, for when updates arrive
@@ -86,15 +86,33 @@ public class OrderBookService {
         Set<BigDecimal> oldBids = bidsExchange.computeIfAbsent(
                 sourceExchange, k -> new HashSet<>());
         for (BigDecimal price : oldBids) {
-            bids.remove(price);
+            //get inner map for price, from bids map
+            Map<Exchange, BigDecimal> innerMap = bids.get(price);
+            if (innerMap != null) {
+                innerMap.remove(sourceExchange);
+                //if innerMap now empty, remove entire price level
+                if (innerMap.isEmpty()) {
+                    bids.remove(price);
+                }
+            }
         }
-        oldBids.clear(); //clear set for new prices
+        //reset tracking set for this exchange
+        bidsExchange.put(sourceExchange, new HashSet<>());
+
 
         //add new bids to consolidated order book and track prices
         for (NormalisedOrderBookEntry bid : newBook.getBids()) {
-            bids.put(bid.price(), bid.quantity());
-            oldBids.add(bid.price());
+            //get/create inner map for this price level
+            Map<Exchange, BigDecimal> innerMap = bids.computeIfAbsent(
+                    bid.price(),
+                    k -> new ConcurrentHashMap<>()
+            );
+            //add this exchanges quantity to inner map
+            innerMap.put(sourceExchange, bid.quantity());
+            //track contribution from exchange
+            bidsExchange.get(sourceExchange).add(bid.price());
         }
+
 
         //Asks update:
         Set<BigDecimal> oldAsks = asksExchange.computeIfAbsent(
