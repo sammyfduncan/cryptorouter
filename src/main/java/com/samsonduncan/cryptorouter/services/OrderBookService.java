@@ -20,7 +20,7 @@ exposes reactive stream (Flux) of consolidated order book
 @Service
 public class OrderBookService {
 
-    //Maps key is price, value is map showing quantity and exchange
+    //Maps key is price, value is map showing exchange and quantity
     //Field for bids map (sorted from highest to lowest)
     private final ConcurrentSkipListMap<BigDecimal, Map<Exchange, BigDecimal>> bids =
             new ConcurrentSkipListMap<>(Comparator.reverseOrder());
@@ -64,12 +64,12 @@ public class OrderBookService {
     }
 
     //Getters, returns immutable copy of current order books
-    public Map<BigDecimal, BigDecimal> getBids() {
-        return bids;
+    public Map<BigDecimal, Map<Exchange, BigDecimal>> getBids() {
+        return Collections.unmodifiableMap(bids);
     }
 
-    public Map<BigDecimal, BigDecimal> getAsks() {
-        return asks;
+    public Map<BigDecimal, Map<Exchange, BigDecimal>> getAsks() {
+        return Collections.unmodifiableMap(asks);
     }
 
 
@@ -83,8 +83,10 @@ public class OrderBookService {
     private synchronized void updateBook(NormalisedOrderBook newBook, Exchange sourceExchange) {
         //Bids update:
         //remove all old bids from this exchange
-        Set<BigDecimal> oldBids = bidsExchange.computeIfAbsent(
-                sourceExchange, k -> new HashSet<>());
+        Set<BigDecimal> oldBids = bidsExchange.getOrDefault(
+                sourceExchange,
+                new HashSet<>());
+
         for (BigDecimal price : oldBids) {
             //get inner map for price, from bids map
             Map<Exchange, BigDecimal> innerMap = bids.get(price);
@@ -114,19 +116,29 @@ public class OrderBookService {
         }
 
 
-        //Asks update:
-        Set<BigDecimal> oldAsks = asksExchange.computeIfAbsent(
-                sourceExchange, k -> new HashSet<>());
+        //Asks update
+        //First remove old asks from this exchange
+        Set<BigDecimal> oldAsks = asksExchange.getOrDefault(
+                sourceExchange, new HashSet<>());
         for (BigDecimal price : oldAsks) {
-            asks.remove(price);
+            Map<Exchange, BigDecimal> innerMap = asks.get(price);
+            if (innerMap != null) {
+                innerMap.remove(sourceExchange);
+                if (innerMap.isEmpty()) {
+                    asks.remove(price)
+                }
+            }
         }
-        oldAsks.clear();
+        asksExchange.put(sourceExchange, new HashSet<>());
 
         //add new asks
         for (NormalisedOrderBookEntry ask : newBook.getAsks()) {
-            asks.put(ask.price(), ask.quantity());
-            oldAsks.add(ask.price());
+            Map<Exchange, BigDecimal> innerMap = asks.computeIfAbsent(
+                    ask.price(), k -> new ConcurrentHashMap<>());
+            innerMap.put(sourceExchange, ask.quantity());
+            asksExchange.get(sourceExchange).add(ask.price());
         }
+        System.out.println("Book updated");
     }
 
 }
