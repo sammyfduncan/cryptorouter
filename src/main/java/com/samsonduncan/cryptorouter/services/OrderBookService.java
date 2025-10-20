@@ -125,7 +125,7 @@ public class OrderBookService {
             if (innerMap != null) {
                 innerMap.remove(sourceExchange);
                 if (innerMap.isEmpty()) {
-                    asks.remove(price)
+                    asks.remove(price);
                 }
             }
         }
