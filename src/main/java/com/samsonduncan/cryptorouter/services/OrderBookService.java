@@ -54,7 +54,7 @@ public class OrderBookService {
                             normalisedBook.getBids().get(0).exchange();
 
                     //call helper to apply update
-                    //updateBook(normalisedBook, sourceExchange);
+                    updateBook(normalisedBook, sourceExchange);
                 });
     }
 
@@ -138,7 +138,7 @@ public class OrderBookService {
             innerMap.put(sourceExchange, ask.quantity());
             asksExchange.get(sourceExchange).add(ask.price());
         }
-        System.out.println("Book updated");
+        System.out.println("Book updated [" + sourceExchange + "]: " + bids.size() + " Bid Levels, " + asks.size() + " Ask Levels");
     }
 
 }

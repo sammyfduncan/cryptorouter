@@ -86,6 +86,9 @@ public class KrakenConnector extends WebSocketClient {
                 NormalisedOrderBook normalisedBook = translateMessage(
                         bookMessage,
                         pair);
+                //debug
+                //System.out.println("KRAKEN: Translated book with" + normalisedBook.getBids().size() + "bids and " + normalisedBook.getAsks().size() + " asks.");
+
 
                 //call OrderBookService
                 orderBook.processUpdate(normalisedBook);
@@ -108,6 +111,7 @@ public class KrakenConnector extends WebSocketClient {
     @Override
     public void onError(Exception e) {
         System.out.println("Error occurred: " + e);
+        e.printStackTrace(); //rm
     }
 
     //helper to translate raw msg into NormalisedOrderBook
