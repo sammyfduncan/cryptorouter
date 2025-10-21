@@ -34,6 +34,20 @@
     <div class="data-container">
     </div>
 </div>
-
+    <script>
+        const socket = new WebSocket("ws://localhost:8080/ws/orderbook")
+        socket.onopen = function (event) {
+            console.log("WebSocket connection opened.");
+        };
+        socket.onmessage = function (event) {
+            console.log("Message received: ", event.data);
+        };
+        socket.onclose = function (event) {
+            console.log("Websocket connection closed: ", event)
+        }
+        socket.onerror = function (event) {
+            console.error("Websocket error ", event)
+        }
+    </script>
 </body>
 </html>
