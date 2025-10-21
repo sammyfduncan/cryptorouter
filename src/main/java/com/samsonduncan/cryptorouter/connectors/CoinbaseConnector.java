@@ -100,7 +100,7 @@ public class CoinbaseConnector extends WebSocketClient {
                 //now call OrderBookService
                 orderBook.processUpdate(this.coinbaseOrderBook);
 
-            } else if (type.equals("12update")) {
+            } else if (type.equals("l2update")) {
                 //if 12update, first check orderbook has been initialised
                 if (coinbaseOrderBook != null) {
                     //if not null, parse message
