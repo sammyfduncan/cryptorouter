@@ -34,6 +34,7 @@ dependencies {
 	implementation("org.java-websocket:Java-WebSocket:1.5.7")
 	implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
 	implementation("com.nimbusds:nimbus-jose-jwt:9.31")
+	implementation("org.springframework.boot:spring-boot-starter-websocket")
 }
 
 tasks.withType<Test> {
