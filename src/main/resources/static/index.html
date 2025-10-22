@@ -30,24 +30,105 @@
 <div class="dashboard">
     <h2>CR Dashboard</h2>
     <p id="status-message">Loading market data...</p>
+    <h2>Bids</h2>
+    <div id="bids-container">
+    </div>
 
-    <div class="data-container">
+    <h2>Asks</h2>
+    <div id="asks-container">
     </div>
 </div>
-    <script>
-        const socket = new WebSocket("ws://localhost:8080/ws/orderbook")
-        socket.onopen = function (event) {
-            console.log("WebSocket connection opened.");
-        };
-        socket.onmessage = function (event) {
-            console.log("Message received: ", event.data);
-        };
-        socket.onclose = function (event) {
-            console.log("Websocket connection closed: ", event)
+<script>
+    const socket = new WebSocket("ws://localhost:8080/ws/orderbook");
+
+    socket.onopen = function (event) {
+        console.log("WebSocket connection opened.");
+    };
+
+    socket.onmessage = function (event) {
+        // console.log("Message received: ", event.data);
+
+        try {
+            const orderBookData = JSON.parse(event.data);
+            // console.log("Parsed Bids:", orderBookData.bids);
+            // console.log("Parsed Asks:", orderBookData.asks);
+
+            displayBids(orderBookData.bids);
+            displayAsks(orderBookData.asks);
+        } catch (error) {
+            console.error("Error parsing JSON:", error, "Raw data:", event.data);
         }
-        socket.onerror = function (event) {
-            console.error("Websocket error ", event)
-        }
-    </script>
+    };
+
+    socket.onclose = function (event) {
+        console.log("Websocket connection closed: ", event);
+    }
+
+    socket.onerror = function (event) {
+        console.error("Websocket error ", event);
+    }
+
+    function formatNumber(numStr, decimals = 2) {
+        const num = parseFloat(numStr);
+        return num.toFixed(decimals);
+    }
+
+    function displayBids(bidsData) {
+        const bidsContainer = document.getElementById('bids-container');
+        if (!bidsContainer) return; // Safety check
+        bidsContainer.innerHTML = ''; // Clear previous entries
+
+        const sortedPrices = Object.keys(bidsData).sort((a, b) => parseFloat(b) - parseFloat(a));
+        const topBids = sortedPrices.slice(0, 10);
+
+        topBids.forEach(price => {
+            const exchanges = bidsData[price]; // This is the inner map { KRAKEN: qty, COINBASE: qty }
+            const priceLevelDiv = document.createElement('div');
+            priceLevelDiv.style.borderBottom = '1px solid #eee';
+            priceLevelDiv.style.padding = '2px 0';
+
+            let totalQuantity = 0;
+            let exchangeDetails = '';
+
+            for (const exchange in exchanges) {
+                const quantity = parseFloat(exchanges[exchange]);
+                totalQuantity += quantity;
+                exchangeDetails += `${exchange}: ${formatNumber(quantity, 4)} `; // Add quantity per exchange
+            }
+
+            priceLevelDiv.textContent = `Price: ${formatNumber(price, 2)} | Total Qty: ${formatNumber(totalQuantity, 4)} (${exchangeDetails.trim()})`;
+            bidsContainer.appendChild(priceLevelDiv);
+        });
+    }
+
+    function displayAsks(asksData) {
+        const asksContainer = document.getElementById('asks-container');
+        if (!asksContainer) return; // Safety check
+        asksContainer.innerHTML = ''; // Clear previous entries
+
+        const sortedPrices = Object.keys(asksData).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+        const topAsks = sortedPrices.slice(0, 10);
+
+        topAsks.forEach(price => {
+            const exchanges = asksData[price]; // Inner map { KRAKEN: qty, COINBASE: qty }
+            const priceLevelDiv = document.createElement('div');
+            priceLevelDiv.style.borderBottom = '1px solid #eee';
+            priceLevelDiv.style.padding = '2px 0';
+
+            let totalQuantity = 0;
+            let exchangeDetails = '';
+
+            for (const exchange in exchanges) {
+                const quantity = parseFloat(exchanges[exchange]);
+                totalQuantity += quantity;
+                exchangeDetails += `${exchange}: ${formatNumber(quantity, 4)} `;
+            }
+
+            priceLevelDiv.textContent = `Price: ${formatNumber(price, 2)} | Total Qty: ${formatNumber(totalQuantity, 4)} (${exchangeDetails.trim()})`;
+            asksContainer.appendChild(priceLevelDiv);
+        });
+    }
+</script>
 </body>
 </html>
