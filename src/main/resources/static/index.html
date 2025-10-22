@@ -8,18 +8,66 @@
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
+            background-color: #f4f4f4;
         }
         h1 {
             text-align: center;
         }
         .dashboard {
-            margin-top: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
+
+        /* Order Form Styles */
+        .order-form {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .order-form label {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .order-form select,
+        .order-form input[type="number"],
+        .order-form button {
+            padding: 8px;
+            margin-right: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .order-form button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        .order-form button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Data Container Styles */
         .data-container {
             margin-top: 20px;
             padding: 10px;
             border: 1px solid #ccc;
-            min-height: 200px;
+            min-height: 150px;
+            background-color: #fafafa;
+        }
+
+        /* Execution Plan Result Styles */
+        #execution-plan-result {
+            margin-top: 10px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            min-height: 100px;
+            white-space: pre-wrap; /* Helps in formatting text/JSON output */
+            word-wrap: break-word;
         }
     </style>
 </head>
@@ -29,13 +77,26 @@
 
 <div class="dashboard">
     <h2>CR Dashboard</h2>
-    <p id="status-message">Loading market data...</p>
-    <h2>Bids</h2>
-    <div id="bids-container">
+
+    <div class="order-form">
+        <label for="order-side">Side:</label>
+        <select id="order-side" name="side">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+        </select>
+
+        <label for="order-quantity">Quantity:</label>
+        <input type="number" id="order-quantity" name="quantity" placeholder="e.g., 1.5" step="any">
+
+        <button id="get-route-btn">Get Route</button>
     </div>
 
-    <h2>Asks</h2>
-    <div id="asks-container">
+    <p id="status-message">Loading market data...</p>
+    <div class="data-container">
+    </div>
+
+    <h3>Execution Plan</h3>
+    <div id="execution-plan-result">
     </div>
 </div>
 <script>
@@ -46,10 +107,12 @@
     };
 
     socket.onmessage = function (event) {
+        // Keep this log for debugging if needed
         // console.log("Message received: ", event.data);
 
         try {
             const orderBookData = JSON.parse(event.data);
+            // Log the parsed objects if needed for debugging
             // console.log("Parsed Bids:", orderBookData.bids);
             // console.log("Parsed Asks:", orderBookData.asks);
 
@@ -68,46 +131,57 @@
         console.error("Websocket error ", event);
     }
 
+    // --- Helper function to format numbers ---
+    // You might want to adjust the number of decimal places later
     function formatNumber(numStr, decimals = 2) {
         const num = parseFloat(numStr);
         return num.toFixed(decimals);
     }
 
+    // --- Function to display Bids ---
     function displayBids(bidsData) {
         const bidsContainer = document.getElementById('bids-container');
         if (!bidsContainer) return; // Safety check
         bidsContainer.innerHTML = ''; // Clear previous entries
 
+        // Get the prices (keys) and sort them numerically (highest first for bids)
         const sortedPrices = Object.keys(bidsData).sort((a, b) => parseFloat(b) - parseFloat(a));
+
+        // Limit the display to the top N levels (e.g., top 10)
         const topBids = sortedPrices.slice(0, 10);
 
         topBids.forEach(price => {
             const exchanges = bidsData[price]; // This is the inner map { KRAKEN: qty, COINBASE: qty }
             const priceLevelDiv = document.createElement('div');
-            priceLevelDiv.style.borderBottom = '1px solid #eee';
+            priceLevelDiv.style.borderBottom = '1px solid #eee'; // Basic styling
             priceLevelDiv.style.padding = '2px 0';
 
             let totalQuantity = 0;
             let exchangeDetails = '';
 
+            // Iterate through the exchanges at this price level
             for (const exchange in exchanges) {
                 const quantity = parseFloat(exchanges[exchange]);
                 totalQuantity += quantity;
                 exchangeDetails += `${exchange}: ${formatNumber(quantity, 4)} `; // Add quantity per exchange
             }
 
+            // Display Price, Total Quantity, and Exchange Breakdown
             priceLevelDiv.textContent = `Price: ${formatNumber(price, 2)} | Total Qty: ${formatNumber(totalQuantity, 4)} (${exchangeDetails.trim()})`;
             bidsContainer.appendChild(priceLevelDiv);
         });
     }
 
+    // --- Function to display Asks ---
     function displayAsks(asksData) {
         const asksContainer = document.getElementById('asks-container');
         if (!asksContainer) return; // Safety check
         asksContainer.innerHTML = ''; // Clear previous entries
 
+        // Get the prices (keys) and sort them numerically (lowest first for asks)
         const sortedPrices = Object.keys(asksData).sort((a, b) => parseFloat(a) - parseFloat(b));
 
+        // Limit the display
         const topAsks = sortedPrices.slice(0, 10);
 
         topAsks.forEach(price => {
@@ -128,6 +202,118 @@
             priceLevelDiv.textContent = `Price: ${formatNumber(price, 2)} | Total Qty: ${formatNumber(totalQuantity, 4)} (${exchangeDetails.trim()})`;
             asksContainer.appendChild(priceLevelDiv);
         });
+    }
+
+    async function onButtonClick() {
+        const sideInput = document.getElementById('order-side');
+        const quantityInput = document.getElementById('order-quantity');
+        const resultContainer = document.getElementById('execution-plan-result');
+
+        if (!sideInput || !quantityInput || !resultContainer) {
+            console.error("Missing input or result elements on the page.");
+            resultContainer.textContent = "Error: Missing HTML elements.";
+            return;
+        }
+
+        const side = sideInput.value.toUpperCase(); // Get value and ensure uppercase
+        const quantity = quantityInput.value;
+
+        // Basic validation
+        if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0) {
+            resultContainer.textContent = "Please enter a valid positive quantity.";
+            return;
+        }
+        if (side !== 'BUY' && side !== 'SELL') {
+            resultContainer.textContent = "Please select a valid side (BUY or SELL).";
+            return;
+        }
+
+        resultContainer.textContent = "Calculating route...";
+
+        const url = `/route?side=${encodeURIComponent(side)}&quantity=${encodeURIComponent(quantity)}`;
+
+        try {
+            // Send the POST request using fetch
+            const response = await fetch(url, {
+                method: 'POST' // The method goes in the options object
+            });
+
+            // Check if the request was successful (status code 200-299)
+            if (!response.ok) {
+                // Try to get error details from the response body if possible
+                const errorText = await response.text();
+                throw new Error(`HTTP error! Status: ${response.status}. Message: ${errorText}`);
+            }
+
+            // Parse the JSON response body
+            const executionPlan = await response.json();
+
+            // Display the result using a helper function
+            displayExecutionPlan(executionPlan, resultContainer);
+
+        } catch (error) {
+            console.error('Error fetching execution plan:', error);
+            resultContainer.textContent = `Error: ${error.message}`;
+        }
+    }
+
+    // --- Helper function to display the execution plan ---
+    function displayExecutionPlan(plan, container) {
+        container.innerHTML = ''; // Clear previous results
+
+        if (!plan || !plan.legs) {
+            container.textContent = "Received invalid plan data.";
+            return;
+        }
+
+        const title = document.createElement('h3');
+        title.textContent = "Execution Plan";
+        container.appendChild(title);
+
+        const notesP = document.createElement('p');
+        notesP.textContent = `Notes: ${plan.notes || 'N/A'}`;
+        container.appendChild(notesP);
+
+        const vwapP = document.createElement('p');
+        // Assuming formatNumber exists from the previous step
+        vwapP.textContent = `Calculated VWAP: ${formatNumber(plan.vwap, 5)}`; // Show more precision for VWAP
+        container.appendChild(vwapP);
+
+        if (plan.legs.length === 0 && plan.notes.includes("Insufficient liquidity")) {
+            const noLegsP = document.createElement('p');
+            noLegsP.textContent = "No executable legs found.";
+            container.appendChild(noLegsP);
+        } else {
+            const legsList = document.createElement('ul');
+            legsList.style.listStyleType = 'none'; // Basic styling
+            legsList.style.padding = '0';
+
+            plan.legs.forEach(leg => {
+                const legItem = document.createElement('li');
+                legItem.style.borderBottom = '1px solid #ccc';
+                legItem.style.marginBottom = '5px';
+                legItem.textContent =
+                    `-> Fill ${formatNumber(leg.quantity, 6)} ` +
+                    `@ ${formatNumber(leg.price, 2)} ` +
+                    `on ${leg.exchange}`;
+                legsList.appendChild(legItem);
+            });
+            container.appendChild(legsList);
+        }
+    }
+
+    const button = document.getElementById('get-route-btn');
+    if (button) {
+        button.addEventListener('click', onButtonClick);
+    } else {
+        console.error("Button with ID 'get-route-btn' not found.");
+    }
+
+    function formatNumber(numStr, decimals = 2) {
+        if (numStr === null || numStr === undefined) return 'N/A';
+        const num = parseFloat(numStr);
+        if (isNaN(num)) return 'Invalid Number';
+        return num.toFixed(decimals);
     }
 </script>
 </body>
